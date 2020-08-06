@@ -1,0 +1,89 @@
+---
+title: "Barebell lifts prediction using machine learning"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+The main purpose of this document is to create a model to predict the classe of barbell lift performed by 6 participants, there is a total of 5 different ways of barbell lifs.
+
+## Data Load and data cleaning
+
+The data is loaded from 2 different dataset, one for training and testing and a second one for validation. First we load the data, apply some cleaning on the variables.
+
+
+```{r Load data}
+library(caret)
+setwd("./Data")
+csvtraining <- read.csv("pml-training.csv", na.strings = c("NA", "#DIV/0!", ""))
+csvtesting <- read.csv("pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+```
+
+Initially there is a total of 160 columns and 19622 records on training data and 20 records on testing data.
+```{r dim}
+dim(csvtraining)
+dim(csvtesting)
+```
+
+I apply some cleaning on the data, deleting the variables witch has more than 95% of NA values.
+
+```{r clean data}
+ColumnIndexNA <- colSums(is.na(csvtraining))/nrow(csvtraining) < 0.95
+TrainingDataNA <- csvtraining[,ColumnIndexNA]
+```
+Then, I remove the columns related to the time, because there is no need of these variables in our prediction model.
+```{r remove time data}
+FinalTraining <- TrainingDataNA[, -c(1,3:7)]
+#Convert the classe column to a factor variable
+FinalTraining$classe <- factor(FinalTraining$classe)
+dim(FinalTraining)
+```
+At the end, the final dataset contains a total of 54 variables including the predicted variable classe. Then, I apply the same cleaning on the validation data.
+```{r cleaning validation data}
+ColumnNames <- names(FinalTraining)
+Testing <- csvtesting[,ColumnNames[1:53]]
+```
+
+
+## Cross Validacion and Model selection
+
+After loading the data, the next step is to divide the testing data in 2 datasets, needed for cross validation, one for training and the second one for validating the accuracy of the model.
+
+
+```{r cross validation}
+set.seed(12345)
+TrainIndex <- createDataPartition(FinalTraining$classe, p=0.75,list = FALSE)
+Training <- FinalTraining[TrainIndex,]
+Validation <- FinalTraining[-TrainIndex,]
+```
+
+Having created all the datasets needed for the model creation, I selected random forest as a prediction model. This kind of model fits really well on the kind of problem we are trying to solve.
+
+```{r model fit, cache=TRUE}
+
+set.seed(12345)
+FitRF <- train(classe~.,method='rf',data=Training,ntree=100)
+RFPrediction <- predict (FitRF,Validation)
+#Showing the sample error on the model
+confusionMatrix(Validation$classe, RFPrediction)
+```
+
+## Predict on validation data
+
+The result of predicting on testing data:
+
+```{r predict}
+RFPrediction <- predict (FitRF,Testing)
+RFPrediction
+
+```
+## Conclusion
+
+I am getting a 0.9945% in sample accuracy witch is a high level of accuracy, we can accept this value and conclude that using random forest to solve this problem is a good choice.
